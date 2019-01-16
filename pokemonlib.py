@@ -46,7 +46,7 @@ class PokemonGo(object):
                 return Image.open(BytesIO(stdout))
             except (OSError, IOError):
                 logger.debug("Screenshot failed, using fallback method")
-                self.use_fallback_screenshots = True
+                # self.use_fallback_screenshots = True
         return_code, stdout, stderr = await self.run(["adb", "-s", await self.get_device(), "shell", "screencap", "-p", "/sdcard/screen.png"])
         return_code, stdout, stderr = await self.run(["adb", "-s", await self.get_device(), "pull", "/sdcard/screen.png", "."])
         image = Image.open("screen.png")

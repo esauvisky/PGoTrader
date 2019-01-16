@@ -1,6 +1,6 @@
 locations:
-    trade_button: [860, 4670]
-    waiting_box: [207, 3305, 900, 570]
+    trade_button: [860, 1670]
+    waiting_box: [207, 305, 900, 570]
     pokemon_to_trade_box: [300, 160, 780, 230]
     search_button: [950, 320]
     first_pokemon_name_box: [79, 666, 300, 723]
@@ -11,17 +11,19 @@ locations:
     confirm_button_box: [25, 924, 250, 980]
     confirm_button: [120, 950]
 
-    # stardust_box: [422, 975, 581, 1022]
+    stardust_box: [330, 890, 530, 1000]
+
     trade_name_box: [540, 1270, 960, 1330]
-    trade_name_box_alt: [536, 1316, 935, 1390]
 
     close_pokemon_button: [540, 1705]
     weight_box: [100, 1060, 340, 1190]
     height_box: [770, 1065, 980, 1190]
-    # switch_app: [540, 975]
+
+    second_app_position: [540, 975]
 
 waits:
     search_button: 1
     confirm_button: 2
     close_pokemon_button: 3
-    switch_app: 1
+    app_switch: 1
+    # second_app_position: 1

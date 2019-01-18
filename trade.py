@@ -60,7 +60,7 @@ class Main:
         await self.key('APP_SWITCH')
         await self.tap('second_app_position')
 
-    async def click_trade_button(self):
+    async def click_trade_button(self, app='second'):
         while True:
             screencap = await self.p.screencap()
             crop = screencap.crop(self.config['locations']['waiting_box'])
@@ -79,19 +79,24 @@ class Main:
                 logger.info('Found This trade with... has expired box.')
                 await self.tap('error_box_ok')
                 continue
-            elif "Unknown trade error" in text_error:
-                logger.info('Found This trade with... has expired box.')
+            elif "Unknown Trade Error" in text_error:
+                logger.info('Found Unknown Trade Error box.')
                 await self.tap('error_box_ok')
                 continue
             elif "Waiting for" in text_wait:
-                logger.warning('"Waiting for" message received!')
-                break
+                if app == 'first':
+                    logger.warning('"Waiting for" message received! Trade is good to go! Continuing...')
+                    break
+                else:
+                    logger.info('"Waiting for" message received! Waiting for POKEMON TO TRADE screen...')
+                    continue
             elif "POKEMON TO TRADE" in text_continue_trade:
-                logger.warning('Trade is good to go! Continuing...')
+                logger.warning('"POKEMON TO TRADE" message received! Trade is good to go! Continuing...')
                 break
             elif "TRADE" in text_trade_button:
-                logger.warning('Found TRADE button, clicking and checking...')
+                logger.warning('Clicking TRADE button...')
                 await self.tap('trade_button')
+                continue
             else:
                 logger.info('Did not find TRADE button. Got: ' + text_trade_button)
 
@@ -113,26 +118,33 @@ class Main:
 
         # Selects and clicks next
         while True:
-            text = await self.cap_and_crop(self.config['locations']['next_button_box'])
+            screencap = await self.p.screencap()
+            crop = screencap.crop(self.config['locations']['next_button_box'])
+            text = self.tool.image_to_string(crop).replace("\n", " ")
             if text != "NEXT":
                 logger.info("Waiting for next, got" + text)
                 continue
-            logger.warning("Found next button")
-            text = await self.cap_and_crop(self.config['locations']['name_at_next_screen_box'])
+            logger.warning("Found next button checking name...")
+            crop = screencap.crop(self.config['locations']['name_at_next_screen_box'])
+            text = self.tool.image_to_string(crop).replace("\n", " ")
             if TRADE_POKEMON_CHECK not in text:
                 logger.error("First pokemon does not match " + TRADE_POKEMON_CHECK + ".")
                 continue
+            logger.warning("Name is good. Clicking next...")
             await self.tap("next_button")
             break
 
     async def check_and_confirm(self):
         while True:
-            text = await self.cap_and_crop(self.config['locations']['confirm_button_box'])
+            screencap = await self.p.screencap()
+            crop = screencap.crop(self.config['locations']['confirm_button_box'])
+            text = self.tool.image_to_string(crop).replace("\n", " ")
             if text != "CONFIRM":
                 logger.info("Waiting for confirm, got " + text)
                 continue
             logger.warning("Found confirm button, performing last check...")
-            text = await self.cap_and_crop(self.config['locations']['trade_name_box'])
+            crop = screencap.crop(self.config['locations']['trade_name_box'])
+            text = self.tool.image_to_string(crop).replace("\n", " ")
             if TRADE_POKEMON_CHECK not in text:
                 logger.error("Pokemon name is wrong! I've got: " + text)
                 return
@@ -140,13 +152,21 @@ class Main:
             await self.tap("confirm_button")
             break
 
+    async def check_animation_has_finished(self):
+        while True:
+            text = await self.cap_and_crop(self.config['locations']['power_up_box'])
+            if 'POWER UP' in text:
+                logger.warning('Animation finished, closing pokemon and moving on!')
+                await self.tap("close_pokemon_button")
+                break
+            logger.info('Animation not finished yet...')
 
     async def start(self):
         self.p = PokemonGo()
         await self.p.set_device(self.args.device_id)
 
         while True:
-            await self.click_trade_button()
+            await self.click_trade_button('first')
             await self.switch_app()
             await self.click_trade_button()
 
@@ -162,41 +182,15 @@ class Main:
 
             await self.check_and_confirm()
 
-            # while True:
-            #     screencap = await self.p.screencap()
-            #     crop = screencap.crop(
-            #         self.config['locations']['confirm_button_box'])
-            #     text = self.tool.image_to_string(crop).replace("\n", " ")
-            #     if text == "CONFIRM":
-            #         await self.tap("confirm_button")
-            #         continue
-            #     if text != "CANCEL":
-            #         print("Cancel button is gone, we ready to move on")
-            #         break
+            logger.warning('Sleeping for cutscene...')
+            await asyncio.sleep(16)
 
-            # print("Sleeping for cutscene")
-            # await asyncio.sleep(10)
+            await self.check_animation_has_finished()
 
-            # while True:
-            #     screencap = await self.p.screencap()
-            #     crop = screencap.crop(self.config['locations']['weight_box'])
-            #     text = self.tool.image_to_string(crop).replace("\n", " ")
-            #     if text != "WEIGHT":
-            #         print("Waiting for pokemon to appear (WEIGHT not found)", text)
-            #         continue
-            #     crop = screencap.crop(self.config['locations']['height_box'])
-            #     text = self.tool.image_to_string(crop).replace("\n", " ")
-            #     if text != "HEIGHT":
-            #         print(
-            #             "Waiting for pokemon to appear (HEIGHT not found", text)
-            #         continue
-            #     print("Height and weight found, continuing")
-            #     break
+            # Switches back. The expired mesage will be clicked on the next loop
+            await self.switch_app()
 
-            # await self.tap("close_pokemon_button")
 
-            # # Switches and clicks the expired message
-            # await self.key('APP_SWITCH')
             # await self.tap('second_app_position')
 
             # while True:

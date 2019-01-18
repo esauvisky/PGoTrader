@@ -1,36 +1,30 @@
 locations:
-    trade_button: [860, 1670]
-    trade_button_label: [790, 1680, 1000, 1730]
-    waiting_box: [207, 305, 900, 570]
-    pokemon_to_trade_box: [300, 160, 780, 230]
-    search_button: [950, 320]
-    first_pokemon_name_box: [79, 666, 300, 723]
-    first_pokemon: [200, 600]
-    next_button_box: [475, 1460, 620, 1510]
-    name_at_next_screen_box: [200, 192, 565, 278]
-    next_button: [545, 1484]
-    confirm_button_box: [25, 924, 250, 980]
-    confirm_button: [120, 950]
+    trade_button: [860, 1670]                    # the trade button
+    trade_button_label: [790, 1680, 1000, 1730]  # the label of the trade button
 
-    stardust_box: [330, 890, 530, 1000]
+    waiting_box: [207, 305, 900, 570]  # the Waiting for NAME to connect text
+    error_box: [100, 700, 1000, 1200]  # the error boxes that can appear when trading
+    error_box_ok: [540, 1020]          # the OK button at the error boxes
 
-    trade_name_box: [540, 1270, 960, 1330]
-    trade_name_box_alt: [50, 370, 490, 445]
+    pokemon_to_trade_box: [300, 160, 780, 230]   # the POKEMON TO TRADE text after the trade begins (at the poke selector)
+    search_button: [950, 320]                    # the search button in the pokemon selector
+    first_pokemon_name_box: [79, 666, 300, 723]  # the first pokemon's name text
+    first_pokemon: [200, 600]                    # the first pokemon's position
 
-    close_pokemon_button: [540, 1705]
-    weight_box: [100, 1060, 340, 1190]
-    height_box: [770, 1065, 980, 1190]
+    next_button_box: [475, 1460, 620, 1510]        # the NEXT button text after selecting a pokemon
+    name_at_next_screen_box: [200, 192, 565, 278]  # the pokemon's name in the NEXT screen
+    next_button: [545, 1484]                       # the NEXT button
 
-    error_box: [100, 700, 1000, 1200]
-    error_box_ok: [540, 1020]
+    trade_name_box: [540, 1270, 960, 1330]   # the pokémon's name text in the final screen
+    confirm_button_box: [25, 924, 250, 980]  # the CONFIRM button text in the final screen
+    confirm_button: [120, 950]               # the CONFIRM button
 
-    second_app_position: [540, 975]
+    power_up_box: [190, 1450, 470, 1540]  # the POWER UP text in the pokémon's screen after the animation
+    close_pokemon_button: [540, 1705]     # the X button for closing the pokémon screen
+
+    second_app_position: [540, 975]  # where to click to switch to the second app after the app switcher is opened
 
 waits:
-    trade_button: 2
-    # search_button: 1
-    # confirm_button: 2
-    # close_pokemon_button: 3
-    # app_switch: 1
-    # error_box_ok: 1
-    second_app_position: 1.5
+    trade_button: 1.5
+    second_app_position: 0.5
+    error_box_ok: 1

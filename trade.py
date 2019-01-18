@@ -18,17 +18,13 @@ logger = logging.getLogger('ivcheck')
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
-formatter = ColoredFormatter(
-    "  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s")
+formatter = ColoredFormatter("  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-RE_WAITING_TRADE = re.compile("^Waiting for (.+) to be available for trading.$")
-POKEMON_TO_TRADE = "POKEMON TO TRADE"
 
-
-TRADE_POKEMON_CHECK = "AAA"
-TRADE_POKEMON_SEARCH = "∞"
+TRADE_POKEMON_CHECK = "TRADE"
+POKEMON_SEARCH_STRING = "Ω"
 
 
 class Main:
@@ -49,276 +45,172 @@ class Main:
         if str(keycode).lower in self.config['waits']:
             await asyncio.sleep(self.config['waits'][str(keycode).lower])
 
-    # async def swipe(self, location, duration):
-    #     await self.p.swipe(
-    #         self.config['locations'][location][0],
-    #         self.config['locations'][location][1],
-    #         self.config['locations'][location][0],
-    #         self.config['locations'][location][1],
-    #         duration
-    #     )
-    #     if location in self.config['waits']:
-    #         await asyncio.sleep(self.config['waits'][location])
+    async def cap_and_crop(self, box_location):
+        '''
+        Returns the text from a location after a screencap
+        '''
+        screencap = await self.p.screencap()
+        crop = screencap.crop(box_location)
+        text = self.tool.image_to_string(crop).replace("\n", " ")
+        logger.info('[OCR] Found text: ' + text)
+        return text
+
+    async def switch_app(self):
+        logger.info('Switching apps...')
+        await self.key('APP_SWITCH')
+        await self.tap('second_app_position')
+
+    async def click_trade_button(self):
+        while True:
+            screencap = await self.p.screencap()
+            crop = screencap.crop(self.config['locations']['waiting_box'])
+            text_wait = self.tool.image_to_string(crop).replace("\n", " ")
+            crop = screencap.crop(self.config['locations']['error_box'])
+            text_error = self.tool.image_to_string(crop).replace("\n", " ")
+            crop = screencap.crop(self.config['locations']['pokemon_to_trade_box'])
+            text_continue_trade = self.tool.image_to_string(crop).replace("\n", " ")
+            crop = screencap.crop(self.config['locations']['trade_button_label'])
+            text_trade_button = self.tool.image_to_string(crop).replace("\n", " ")
+            if "Trade expired" in text_error:
+                logger.info('Found Trade expired box.')
+                await self.tap('error_box_ok')
+                continue
+            elif "This trade with" in text_error:
+                logger.info('Found This trade with... has expired box.')
+                await self.tap('error_box_ok')
+                continue
+            elif "Unknown trade error" in text_error:
+                logger.info('Found This trade with... has expired box.')
+                await self.tap('error_box_ok')
+                continue
+            elif "Waiting for" in text_wait:
+                logger.warning('"Waiting for" message received!')
+                break
+            elif "POKEMON TO TRADE" in text_continue_trade:
+                logger.warning('Trade is good to go! Continuing...')
+                break
+            elif "TRADE" in text_trade_button:
+                logger.warning('Found TRADE button, clicking and checking...')
+                await self.tap('trade_button')
+            else:
+                logger.info('Did not find TRADE button. Got: ' + text_trade_button)
+
+    async def search_select_and_click_next(self):
+        while True:
+            text = await self.cap_and_crop(self.config['locations']['pokemon_to_trade_box'])
+            if "POKEMON TO TRADE" not in text:
+                logger.info('Not in pokemon to trade screen. Trying again...')
+            else:
+                logger.warning('Found POKEMON TO TRADE screen, selecting pokemons...')
+                break
+
+        # Filter pokemon list
+        await self.tap("search_button")
+        await self.p.send_intent("clipper.set", extra_values=[["text", POKEMON_SEARCH_STRING]])
+        await self.p.key('KEYCODE_PASTE')
+        await self.tap("first_pokemon")  # Dismiss keyboard
+        await self.tap("first_pokemon")
+
+        # Selects and clicks next
+        while True:
+            text = await self.cap_and_crop(self.config['locations']['next_button_box'])
+            if text != "NEXT":
+                logger.info("Waiting for next, got" + text)
+                continue
+            logger.warning("Found next button")
+            text = await self.cap_and_crop(self.config['locations']['name_at_next_screen_box'])
+            if TRADE_POKEMON_CHECK not in text:
+                logger.error("First pokemon does not match " + TRADE_POKEMON_CHECK + ".")
+                continue
+            await self.tap("next_button")
+            break
+
+    async def check_and_confirm(self):
+        while True:
+            text = await self.cap_and_crop(self.config['locations']['confirm_button_box'])
+            if text != "CONFIRM":
+                logger.info("Waiting for confirm, got " + text)
+                continue
+            logger.warning("Found confirm button, performing last check...")
+            text = await self.cap_and_crop(self.config['locations']['trade_name_box'])
+            if TRADE_POKEMON_CHECK not in text:
+                logger.error("Pokemon name is wrong! I've got: " + text)
+                return
+            logger.warning("All good, confirming...")
+            await self.tap("confirm_button")
+            break
+
 
     async def start(self):
         self.p = PokemonGo()
         await self.p.set_device(self.args.device_id)
-        # await self.p.start_logcat()
 
         while True:
-            # Wait for trade to start
-            await self.tap('trade_button')
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(self.config['locations']['waiting_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                match = RE_WAITING_TRADE.match(text)
-                if match:
-                    print(text)
-                    break
-                else:
-                    crop = screencap.crop(
-                        self.config['locations']['pokemon_to_trade_box'])
-                    text = self.tool.image_to_string(crop).replace("\n", " ")
-                    if text == "POKEMON TO TRADE":
-                        print("Pokemon to trade screen reached")
-                        break
+            await self.click_trade_button()
+            await self.switch_app()
+            await self.click_trade_button()
 
-            # Switch apps
-            await self.key('APP_SWITCH')
-            await self.tap('second_app_position')
+            await self.search_select_and_click_next()
 
-            # Wait for trade to start
-            await self.tap('trade_button')
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(self.config['locations']['waiting_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                match = RE_WAITING_TRADE.match(text)
-                if match:
-                    print(text)
-                    continue
-                else:
-                    crop = screencap.crop(
-                        self.config['locations']['pokemon_to_trade_box'])
-                    text = self.tool.image_to_string(crop).replace("\n", " ")
-                    if text == "POKEMON TO TRADE":
-                        print("Pokemon to trade screen reached")
-                        break
+            await self.switch_app()
 
-            # Filter pokemon list
-            await self.tap("search_button")
-            # await self.p.text(TRADE_POKEMON_STRING)
-            await self.p.send_intent("clipper.set", extra_values=[["text", TRADE_POKEMON_SEARCH]])
-            # await self.p.send_intent('adb shell am broadcast - a clipper.set - e text {}'.format(TRADE_POKEMON_STRING)
-            if args.touch_paste:
-                await self.swipe('edit_box', 600)
-                await self.tap('paste')
-            else:
-                await self.p.key('KEYCODE_PASTE')
-            await asyncio.sleep(1)
+            await self.search_select_and_click_next()
 
+            await self.check_and_confirm()
 
-            while True:  # Check a pokemon is available and has the correct name
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['first_pokemon_name_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if TRADE_POKEMON_CHECK in text:
-                    break
-                print("Pokemon name is incorrect, got {}".format(text))
+            await self.switch_app()
 
-            await self.tap("first_pokemon")  # Dismiss keyboard
-            await self.tap("first_pokemon")  # Dismiss keyboard
+            await self.check_and_confirm()
 
-            # Selects and clicks next
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['next_button_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text != "NEXT":
-                    print("Waiting for next, got", text)
-                    continue
-                print("Found next button")
-                crop = screencap.crop(
-                    self.config['locations']['name_at_next_screen_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if TRADE_POKEMON_CHECK not in text:
-                    print("Pokemons name is wrong, got", text)
-                    continue
-                await self.tap("next_button")
-                break
+            # while True:
+            #     screencap = await self.p.screencap()
+            #     crop = screencap.crop(
+            #         self.config['locations']['confirm_button_box'])
+            #     text = self.tool.image_to_string(crop).replace("\n", " ")
+            #     if text == "CONFIRM":
+            #         await self.tap("confirm_button")
+            #         continue
+            #     if text != "CANCEL":
+            #         print("Cancel button is gone, we ready to move on")
+            #         break
 
-            # Switches back and selects pkm
-            await self.key('APP_SWITCH')
-            await self.tap('second_app_position')
+            # print("Sleeping for cutscene")
+            # await asyncio.sleep(10)
 
-            # Wait for trade to start
-            await self.tap('trade_button')
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(self.config['locations']['waiting_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                match = RE_WAITING_TRADE.match(text)
-                if match:
-                    print(text)
-                    continue
-                else:
-                    crop = screencap.crop(
-                        self.config['locations']['pokemon_to_trade_box'])
-                    text = self.tool.image_to_string(crop).replace("\n", " ")
-                    if text == "POKEMON TO TRADE":
-                        print("Pokemon to trade screen reached")
-                        break
+            # while True:
+            #     screencap = await self.p.screencap()
+            #     crop = screencap.crop(self.config['locations']['weight_box'])
+            #     text = self.tool.image_to_string(crop).replace("\n", " ")
+            #     if text != "WEIGHT":
+            #         print("Waiting for pokemon to appear (WEIGHT not found)", text)
+            #         continue
+            #     crop = screencap.crop(self.config['locations']['height_box'])
+            #     text = self.tool.image_to_string(crop).replace("\n", " ")
+            #     if text != "HEIGHT":
+            #         print(
+            #             "Waiting for pokemon to appear (HEIGHT not found", text)
+            #         continue
+            #     print("Height and weight found, continuing")
+            #     break
 
-            # Filter pokemon list
-            await self.tap("search_button")
-            # await self.p.text(TRADE_POKEMON_STRING)
-            await self.p.send_intent("clipper.set", extra_values=[["text", TRADE_POKEMON_SEARCH]])
-            # await self.p.send_intent('adb shell am broadcast - a clipper.set - e text {}'.format(TRADE_POKEMON_STRING)
-            if args.touch_paste:
-                await self.swipe('edit_box', 600)
-                await self.tap('paste')
-            else:
-                await self.p.key('KEYCODE_PASTE')
-            await asyncio.sleep(1)
+            # await self.tap("close_pokemon_button")
 
-            while True:  # Check a pokemon is available and has the correct name
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['first_pokemon_name_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if TRADE_POKEMON_CHECK in text:
-                    break
-                print("Pokemon name is incorrect, got {}".format(text))
+            # # Switches and clicks the expired message
+            # await self.key('APP_SWITCH')
+            # await self.tap('second_app_position')
 
-            await self.tap("first_pokemon")  # Dismiss keyboard
-            await self.tap("first_pokemon")  # Dismiss keyboard
+            # while True:
+            #     crop = screencap.crop(self.config['locations']['error_box'])
+            #     text = self.tool.image_to_string(crop).replace("\n", " ")
+            #     if "Trade expired" in text:
+            #         print('Found Trade expired box.')
+            #         await self.tap('error_box_ok')
+            #         break
+            #     elif "This trade with" in text:
+            #         print('Found This trade with... has expired box.')
+            #         await self.tap('error_box_ok')
+            #         break
 
-            # Selects and clicks next
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['next_button_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text != "NEXT":
-                    print("Waiting for next, got", text)
-                    continue
-                print("Found next button")
-                crop = screencap.crop(
-                    self.config['locations']['name_at_next_screen_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if TRADE_POKEMON_CHECK not in text:
-                    print("Pokemons name is wrong, got", text)
-                    continue
-                await self.tap("next_button")
-                break
-
-            # Confirms on user 2
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['confirm_button_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text != "CONFIRM":
-                    print("Waiting for confirm, got", text)
-                    continue
-                print("Found confirm button")
-
-                # crop = screencap.crop(self.config['locations']['stardust_box'])
-                # text = self.tool.image_to_string(crop).replace("\n", " ")
-                # if text >= "800":
-                #     print("Expecting less than 800 stardust cost, got", text)
-                #     return
-                crop = screencap.crop(
-                    self.config['locations']['trade_name_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-
-                if TRADE_POKEMON_CHECK not in text:
-                    print("Pokemon name is wrong, I've got: ", text)
-                    return
-                print("Confirming trade")
-                await self.tap("confirm_button")
-                break
-
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['confirm_button_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text == "CONFIRM":
-                    await self.tap("confirm_button")
-                    continue
-                if text != "CANCEL":
-                    print("Cancel button is gone, we ready to move on")
-                    break
-
-            # Switches again, and confirms
-            await self.key('APP_SWITCH')
-            await self.tap('second_app_position')
-
-            # Confirms on user 1
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['confirm_button_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text != "CONFIRM":
-                    print("Waiting for confirm, got", text)
-                    continue
-                print("Found confirm button")
-
-                # crop = screencap.crop(self.config['locations']['stardust_box'])
-                # text = self.tool.image_to_string(crop).replace("\n", " ")
-                # if text >= "800":
-                #     print("Expecting less than 800 stardust cost, got", text)
-                #     return
-                crop = screencap.crop(
-                    self.config['locations']['trade_name_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                crop = screencap.crop(
-                    self.config['locations']['trade_name_box_alt'])
-                text2 = self.tool.image_to_string(crop).replace("\n", " ")
-                if TRADE_POKEMON_CHECK not in text:
-                    print("Pokemon name is wrong, I've got: ", text)
-                    return
-                print("Confirming trade")
-                await self.tap("confirm_button")
-                break
-
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(
-                    self.config['locations']['confirm_button_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text == "CONFIRM":
-                    await self.tap("confirm_button")
-                    continue
-                if text != "CANCEL":
-                    print("Cancel button is gone, we ready to move on")
-                    break
-
-            print("Sleeping for cutscene")
-            await asyncio.sleep(10)
-
-            while True:
-                screencap = await self.p.screencap()
-                crop = screencap.crop(self.config['locations']['weight_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text != "WEIGHT":
-                    print("Waiting for pokemon to appear (WEIGHT not found)", text)
-                    continue
-                crop = screencap.crop(self.config['locations']['height_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                if text != "HEIGHT":
-                    print(
-                        "Waiting for pokemon to appear (HEIGHT not found", text)
-                    continue
-                print("Height and weight found, continuing")
-                break
-
-            await self.tap("close_pokemon_button")
 
 
 if __name__ == '__main__':

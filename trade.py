@@ -46,9 +46,6 @@ class Main:
             await asyncio.sleep(self.config['waits'][str(keycode).lower])
 
     async def cap_and_crop(self, box_location):
-        '''
-        Returns the text from a location after a screencap
-        '''
         screencap = await self.p.screencap()
         crop = screencap.crop(box_location)
         text = self.tool.image_to_string(crop).replace("\n", " ")
@@ -189,22 +186,6 @@ class Main:
 
             # Switches back. The expired mesage will be clicked on the next loop
             await self.switch_app()
-
-
-            # await self.tap('second_app_position')
-
-            # while True:
-            #     crop = screencap.crop(self.config['locations']['error_box'])
-            #     text = self.tool.image_to_string(crop).replace("\n", " ")
-            #     if "Trade expired" in text:
-            #         print('Found Trade expired box.')
-            #         await self.tap('error_box_ok')
-            #         break
-            #     elif "This trade with" in text:
-            #         print('Found This trade with... has expired box.')
-            #         await self.tap('error_box_ok')
-            #         break
-
 
 
 if __name__ == '__main__':

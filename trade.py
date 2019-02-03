@@ -23,10 +23,6 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-TRADE_POKEMON_CHECK = "TRADE"
-POKEMON_SEARCH_STRING = "Ω"
-
-
 class Main:
     def __init__(self, args):
         with open(args.config, "r") as f:
@@ -34,6 +30,9 @@ class Main:
         self.args = args
         tools = pyocr.get_available_tools()
         self.tool = tools[0]
+
+        self.CHECK_STRING = self.config['names']['name_check']
+        self.SEARCH_STRING = self.config['names']['search_string']
 
     async def tap(self, location):
         await self.p.tap(*self.config['locations'][location])
@@ -116,7 +115,7 @@ class Main:
 
         # Filter pokemon list
         await self.tap("search_button")
-        await self.p.send_intent("clipper.set", extra_values=[["text", POKEMON_SEARCH_STRING]])
+        await self.p.send_intent("clipper.set", extra_values=[["text", self.SEARCH_STRING]])
         await self.p.key('KEYCODE_PASTE')
         await self.tap("first_pokemon")  # Dismiss keyboard
         await self.tap("first_pokemon")
@@ -133,8 +132,8 @@ class Main:
             logger.warning("Found next button checking name...")
             crop = screencap.crop(self.config['locations']['name_at_next_screen_box'])
             text = self.tool.image_to_string(crop).replace("\n", " ")
-            if TRADE_POKEMON_CHECK not in text:
-                logger.error("[Next Screen] Pokemon does not match " + TRADE_POKEMON_CHECK + ". Got: " + text)
+            if self.CHECK_STRING not in text:
+                logger.error("[Next Screen] Pokemon does not match " + self.CHECK_STRING + ". Got: " + text)
                 continue
             logger.warning("Name is good. Clicking next...")
             await self.tap("next_button")
@@ -151,7 +150,7 @@ class Main:
             logger.warning("Found confirm button, performing last check...")
             crop = screencap.crop(self.config['locations']['trade_name_box'])
             text = self.tool.image_to_string(crop).replace("\n", " ")
-            if TRADE_POKEMON_CHECK not in text:
+            if self.CHECK_STRING not in text:
                 logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text)
                 continue
             logger.warning("Pokemon name's good, confirming...")
@@ -222,7 +221,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pokemon go renamer')
     parser.add_argument('--device-id', type=str, default=None,
                         help="Optional, if not specified the phone is automatically detected. Useful only if you have multiple phones connected. Use adb devices to get a list of ids.")
-    parser.add_argument('--config', type=str, default='config_trades.yaml',
+    parser.add_argument('--config', type=str, default='config.yaml',
                         help="Config file location.")
     args = parser.parse_args()
 

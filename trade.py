@@ -58,6 +58,7 @@ class Main:
         await self.tap('second_app_position')
 
     async def click_trade_button(self, app='second'):
+        count = 0
         while True:
             screencap = await self.p.screencap()
             crop = screencap.crop(self.config['locations']['waiting_box'])
@@ -68,32 +69,39 @@ class Main:
             text_continue_trade = self.tool.image_to_string(crop).replace("\n", " ")
             crop = screencap.crop(self.config['locations']['trade_button_label'])
             text_trade_button = self.tool.image_to_string(crop).replace("\n", " ")
+
+            # Switches apps whenever count is too high (usually fixes stall problems, particularly on 'Waiting for' screen)
+            if count > 5:
+                count = 0
+                logger.error('The trade has stalled. Trying to switch apps...')
+                await self.switch_app()
+                continue
+
             if "Trade expired" in text_error:
                 logger.info('Found Trade expired box.')
                 await self.tap('error_box_ok')
-                continue
             elif "This trade with" in text_error:
                 logger.info('Found This trade with... has expired box.')
                 await self.tap('error_box_ok')
-                continue
+            elif "out of range" in text_error:
+                logger.info('Found out of range box.')
+                await self.tap('error_box_ok')
             elif "Unknown Trade Error" in text_error:
                 logger.info('Found Unknown Trade Error box.')
                 await self.tap('error_box_ok')
-                continue
             elif "Waiting for" in text_wait:
                 if app == 'first':
                     logger.warning('"Waiting for" message received! Trade is good to go! Continuing...')
                     break
                 else:
                     logger.info('"Waiting for" message received! Waiting for POKEMON TO TRADE screen...')
-                    continue
+                    count += 1
             elif "POKEMON TO TRADE" in text_continue_trade:
                 logger.warning('"POKEMON TO TRADE" message received! Trade is good to go! Continuing...')
                 break
             elif "TRADE" in text_trade_button:
                 logger.warning('Clicking TRADE button...')
                 await self.tap('trade_button')
-                continue
             else:
                 logger.info('Did not find TRADE button. Got: ' + text_trade_button)
 
@@ -112,6 +120,7 @@ class Main:
         await self.p.key('KEYCODE_PASTE')
         await self.tap("first_pokemon")  # Dismiss keyboard
         await self.tap("first_pokemon")
+        await asyncio.sleep(1.5)
 
         # Selects and clicks next
         while True:
@@ -125,13 +134,13 @@ class Main:
             crop = screencap.crop(self.config['locations']['name_at_next_screen_box'])
             text = self.tool.image_to_string(crop).replace("\n", " ")
             if TRADE_POKEMON_CHECK not in text:
-                logger.error("First pokemon does not match " + TRADE_POKEMON_CHECK + ".")
+                logger.error("[Next Screen] Pokemon does not match " + TRADE_POKEMON_CHECK + ". Got: " + text)
                 continue
             logger.warning("Name is good. Clicking next...")
             await self.tap("next_button")
             break
 
-    async def check_and_confirm(self):
+    async def check_and_confirm(self, app='second'):
         while True:
             screencap = await self.p.screencap()
             crop = screencap.crop(self.config['locations']['confirm_button_box'])
@@ -143,16 +152,37 @@ class Main:
             crop = screencap.crop(self.config['locations']['trade_name_box'])
             text = self.tool.image_to_string(crop).replace("\n", " ")
             if TRADE_POKEMON_CHECK not in text:
-                logger.error("Pokemon name is wrong! I've got: " + text)
-                return
-            logger.warning("All good, confirming...")
+                logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text)
+                continue
+            logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")
+
+            # Add a detect for the CANCEL button, just for the first app
+            # when GPS fails exactly at the right moment it doesn't counts
+            if app == 'first':
+                count = 0
+                while True:
+                    count += 1
+                    logger.warning("Detecting CANCEL...")
+                    screencap = await self.p.screencap()
+                    crop = screencap.crop(self.config['locations']['confirm_button_box'])
+                    text = self.tool.image_to_string(crop).replace("\n", " ")
+                    if text != "CANCEL":
+                        logger.info("Waiting for cancel, got " + text)
+                        if count > 5:
+                            count = 0
+                            logger.error('The confirming did not work. Trying again...')
+                            await self.tap("confirm_button")
+                        continue
+                    logger.warning('Found CANCEL. First app is OK. Moving on...')
+                    break
+
             break
 
     async def check_animation_has_finished(self):
         while True:
-            text = await self.cap_and_crop(self.config['locations']['power_up_box'])
-            if 'POWER UP' in text:
+            text = await self.cap_and_crop(self.config['locations']['weight_box'])
+            if 'WEIGHT' in text or 'kg' in text:
                 logger.warning('Animation finished, closing pokemon and moving on!')
                 await self.tap("close_pokemon_button")
                 break
@@ -173,7 +203,7 @@ class Main:
 
             await self.search_select_and_click_next()
 
-            await self.check_and_confirm()
+            await self.check_and_confirm('first')
 
             await self.switch_app()
 
@@ -192,10 +222,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pokemon go renamer')
     parser.add_argument('--device-id', type=str, default=None,
                         help="Optional, if not specified the phone is automatically detected. Useful only if you have multiple phones connected. Use adb devices to get a list of ids.")
-    parser.add_argument('--max-retries', type=int, default=0,
-                        help="Maximum retries, set to 0 for unlimited.")
-    parser.add_argument('--touch-paste', default=False, action='store_true',
-                        help="Use touch instead of keyevent for paste.")
     parser.add_argument('--config', type=str, default='config_trades.yaml',
                         help="Config file location.")
     args = parser.parse_args()

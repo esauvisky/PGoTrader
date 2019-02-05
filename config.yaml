@@ -34,7 +34,7 @@ waits:
 names:
     name_check: "TRADE"   # all your trading pokémons *must* contain this string to ensure
                           #   the script doesn't trade a pokémon that wasn't intended to be traded.
-    pokemon_search: "Ω"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
+    search_string: "Ω"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
 
     # Example:
     #   If all your pokémons for trade are named: '! TRADE', you'd use above:

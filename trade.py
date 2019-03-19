@@ -1,20 +1,18 @@
 #!/usr/bin/env python3.7
 import argparse
 import asyncio
+import logging
 import re
+import sys
 from sys import platform
 
-from PIL import Image
-import sys
-from pyocr import pyocr
-from pyocr import builders
 import yaml
+from PIL import Image
+from pyocr import builders, pyocr
 
 import coordpicker
-
 from pokemonlib import PokemonGo
 
-import logging
 try:
     import colorlog
     HAVE_COLORLOG = True

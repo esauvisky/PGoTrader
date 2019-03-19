@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.7
 import argparse
 import asyncio
 import logging
@@ -9,6 +10,8 @@ import sys
 from pyocr import pyocr
 from pyocr import builders
 import yaml
+
+import cv2
 
 from pokemonlib import PokemonGo
 
@@ -30,9 +33,38 @@ class Main:
         self.args = args
         tools = pyocr.get_available_tools()
         self.tool = tools[0]
+        self.p = PokemonGo()
 
         self.CHECK_STRING = self.config['names']['name_check']
         self.SEARCH_STRING = self.config['names']['search_string']
+
+    async def pick_box_coordinate(self, screencap):
+        # Read image
+        try:
+            img = cv2.imread(screencap)
+        except TypeError:
+            img = cv2.imread(screencap.filename)
+
+        height, width, _ = img.shape
+
+        # Select ROI
+        cv2.namedWindow("Select", cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_EXPANDED)
+        cv2.resizeWindow("Select", (int(width/2), int(height/2)))
+        r = cv2.selectROI("Select", img)
+
+        # Crop image
+        imCrop = img[int(r[1]):int(r[1] + r[3]), int(r[0]):int(r[0] + r[2])]
+
+        if imCrop.size == 0:
+            return False
+
+        # Display cropped image
+        # cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
+        # cv2.imshow("Image", imCrop)
+        cv2.waitKey(0)
+
+        logger.info('You picked [%s, %s, %s, %s]', int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3]))
+        return [int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3])]
 
     async def tap(self, location):
         await self.p.tap(*self.config['locations'][location])
@@ -54,6 +86,7 @@ class Main:
     async def switch_app(self):
         logger.info('Switching apps...')
         await self.key('APP_SWITCH')
+        await asyncio.sleep(1)
         await self.tap('second_app_position')
 
     async def click_trade_button(self, app='second'):
@@ -154,6 +187,9 @@ class Main:
             text2 = self.tool.image_to_string(crop2).replace("\n", " ")
             if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
                 logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
+                crop.show()
+                logger.error("Select a new rectangle. Press space twice when ready.")
+                self.config['locations']['trade_name_box'] = await self.pick_box_coordinate(screencap)
                 continue
             logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")
@@ -199,7 +235,6 @@ class Main:
             logger.info('Animation not finished yet...')
 
     async def start(self):
-        self.p = PokemonGo()
         await self.p.set_device(self.args.device_id)
 
         while True:

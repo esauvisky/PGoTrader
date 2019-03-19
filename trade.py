@@ -1,7 +1,6 @@
 #!/usr/bin/env python3.7
 import argparse
 import asyncio
-import logging
 import re
 from sys import platform
 
@@ -15,16 +14,28 @@ import coordpicker
 
 from pokemonlib import PokemonGo
 
-from colorlog import ColoredFormatter
+import logging
+try:
+    import colorlog
+    HAVE_COLORLOG = True
+except ImportError:
+    HAVE_COLORLOG = False
 
-logger = logging.getLogger('ivcheck')
-logger.setLevel(logging.INFO)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-formatter = ColoredFormatter("  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-
+def create_logger():
+    '''Setup the logging environment'''
+    log = logging.getLogger()  # root logger
+    log.setLevel(logging.INFO)
+    format_str = '[%(asctime)s] (%(name)8.8s) %(levelname)8s | %(message)s'
+    date_format = '%Y-%m-%d %H:%M:%S'
+    if HAVE_COLORLOG:
+        cformat = '%(log_color)s' + format_str
+        formatter = colorlog.ColoredFormatter(cformat, date_format)
+    else:
+        formatter = logging.Formatter(format_str, date_format)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    log.addHandler(stream_handler)
+    return logging.getLogger(__name__)
 
 class Main:
     def __init__(self, args):
@@ -236,6 +247,7 @@ class Main:
 
 
 if __name__ == '__main__':
+    logger = create_logger()
     parser = argparse.ArgumentParser(description='Pokemon go renamer')
     parser.add_argument('--device-id', type=str, default=None,
                         help="Optional, if not specified the phone is automatically detected. Useful only if you have multiple phones connected. Use adb devices to get a list of ids.")

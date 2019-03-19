@@ -1,8 +1,13 @@
 import cv2
+import logging
 
-def coordinate_picker(screencap="screencap.png"):
+def pick_box_coordinate(image):
     # Read image
-    img = cv2.imread(screencap)
+    try:
+        img = cv2.imread(image)
+    except TypeError:
+        img = cv2.imread(image.filename)
+
     height, width, _ = img.shape
 
     # Select ROI
@@ -21,7 +26,5 @@ def coordinate_picker(screencap="screencap.png"):
     # cv2.imshow("Image", imCrop)
     cv2.waitKey(0)
 
-    print(int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3]))
+    logging.info('You picked [%s, %s, %s, %s]', int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3]))
     return [int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3])]
-
-coordinate_picker()

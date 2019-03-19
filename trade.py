@@ -11,7 +11,7 @@ from pyocr import pyocr
 from pyocr import builders
 import yaml
 
-import cv2
+import coordpicker
 
 from pokemonlib import PokemonGo
 
@@ -37,34 +37,6 @@ class Main:
 
         self.CHECK_STRING = self.config['names']['name_check']
         self.SEARCH_STRING = self.config['names']['search_string']
-
-    async def pick_box_coordinate(self, screencap):
-        # Read image
-        try:
-            img = cv2.imread(screencap)
-        except TypeError:
-            img = cv2.imread(screencap.filename)
-
-        height, width, _ = img.shape
-
-        # Select ROI
-        cv2.namedWindow("Select", cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_EXPANDED)
-        cv2.resizeWindow("Select", (int(width/2), int(height/2)))
-        r = cv2.selectROI("Select", img)
-
-        # Crop image
-        imCrop = img[int(r[1]):int(r[1] + r[3]), int(r[0]):int(r[0] + r[2])]
-
-        if imCrop.size == 0:
-            return False
-
-        # Display cropped image
-        # cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
-        # cv2.imshow("Image", imCrop)
-        cv2.waitKey(0)
-
-        logger.info('You picked [%s, %s, %s, %s]', int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3]))
-        return [int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3])]
 
     async def tap(self, location):
         await self.p.tap(*self.config['locations'][location])
@@ -189,7 +161,7 @@ class Main:
                 logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
                 crop.show()
                 logger.error("Select a new rectangle. Press space twice when ready.")
-                self.config['locations']['trade_name_box'] = await self.pick_box_coordinate(screencap)
+                self.config['locations']['trade_name_box'] = await coordpicker.pick_box_coordinate(screencap)
                 continue
             logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")

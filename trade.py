@@ -150,8 +150,10 @@ class Main:
             logger.warning("Found confirm button, performing last check...")
             crop = screencap.crop(self.config['locations']['trade_name_box'])
             text = self.tool.image_to_string(crop).replace("\n", " ")
-            if self.CHECK_STRING not in text:
-                logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text)
+            crop2 = screencap.crop(self.config['locations']['trade_name_box_no_location'])
+            text2 = self.tool.image_to_string(crop2).replace("\n", " ")
+            if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
+                logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
                 continue
             logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")
@@ -175,7 +177,16 @@ class Main:
                         continue
                     logger.warning('Found CANCEL. First app is OK. Moving on...')
                     break
-
+            elif app == 'second':
+                await asyncio.sleep(2)
+                screencap = await self.p.screencap()
+                crop = screencap.crop(self.config['locations']['confirm_button_box'])
+                text = self.tool.image_to_string(crop).replace("\n", " ")
+                while text == "CONFIRM":
+                    logger.error("Confirmation didn't get through. Trying again...")
+                    await self.tap("confirm_button")
+                    continue
+                break
             break
 
     async def check_animation_has_finished(self):

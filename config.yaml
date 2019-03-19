@@ -15,6 +15,7 @@ locations:
     next_button: [545, 1484]                       # the NEXT button
 
     trade_name_box: [580, 1280, 960, 1345]                # the pokémon's name text in the final screen
+    trade_name_box_no_location: [580, 1280, 930, 1390]    # the pokémon's name text in the final screen (when it has no location info)
     confirm_button_box: [26, 928, 240, 990]  # the CONFIRM button text in the final screen
     confirm_button: [120, 950]               # the CONFIRM button
 

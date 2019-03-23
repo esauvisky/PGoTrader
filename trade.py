@@ -70,6 +70,50 @@ class Main:
         await asyncio.sleep(1)
         await self.tap('second_app_position')
 
+    async def get_text(self, image, location):
+        '''OCR's a piece/box of an image and returns the string, if any.add()
+
+        Arguments:
+            image    {image}   -- image object
+            location {string}  -- the name of the location in config.yaml
+
+        Returns:
+            [string|bool] -- Returns the OCR'd text, or false if empty or nothing found.
+        '''
+
+        try:
+            cropped_image = image.crop(self.config['locations'][location])
+        except:
+            new_location = self.get_location(location, image)
+            cropped_image = image.crop(self.config['locations'][new_location])
+
+        final_string = self.tool.image_to_string(cropped_image).replace("\n", " ").strip()
+
+        if final_string == '' or not final_string:
+            return false
+
+        return final_string
+
+    async def get_location(self, location, image):
+        '''Checks if the location exists on yaml.
+            In case it doesn't, opens the wizard to pick coords.
+            Afterwards appends them it on picked_coordinates.txt.
+
+        Arguments:
+            location {string} -- the name of the location
+            image    {image}  -- an image file or image object
+
+        Returns:
+            [array]           -- an array of either two or four elements
+        '''
+        logger.error('Coordinate not found! Please select the coordinates for %s and press Space or Enter twice when done.', location)
+        coordinates = await coordpicker.pick_box_coordinate(image)
+        with open("picked_coordinates.txt", mode="a") as file:
+            await file.write(location + ': ' + coordinates)
+        logger.warning('Coordinate was saved to file picked_coordinates.txt. Put them on config.yaml afterwards to avoid this problem!')
+        return coordinates
+
+
     async def click_trade_button(self, app='second'):
         count = 0
         while True:

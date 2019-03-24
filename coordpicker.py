@@ -1,12 +1,18 @@
-import cv2
+
 import logging
 
-def pick_box_coordinate(image):
+async def pick_box_coordinate(image):
     # Read image
     try:
+        img = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
+    except AttributeError:
         img = cv2.imread(image)
     except TypeError:
         img = cv2.imread(image.filename)
+    except Exception as e:
+        logger.error(e)
+        exit()
+
 
     height, width, _ = img.shape
 

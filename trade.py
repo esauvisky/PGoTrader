@@ -1,6 +1,8 @@
 #!/usr/bin/env python3.7
 import argparse
 import asyncio
+import cv2
+import numpy
 import logging
 import re
 import sys
@@ -10,7 +12,6 @@ import yaml
 from PIL import Image
 from pyocr import builders, pyocr
 
-import coordpicker
 from pokemonlib import PokemonGo
 
 try:
@@ -18,6 +19,7 @@ try:
     HAVE_COLORLOG = True
 except ImportError:
     HAVE_COLORLOG = False
+
 
 def create_logger():
     '''Setup the logging environment'''
@@ -35,6 +37,14 @@ def create_logger():
     log.addHandler(stream_handler)
     return logging.getLogger(__name__)
 
+def get_median_location(box_location):
+    '''
+    Given a list of 4 coordinates, returns the central point of the box
+    '''
+    x1, y1, x2, y2 = box_location
+    return [int((x1 + x2) / 2), int((y1 + y2) / 2)]
+
+
 class Main:
     def __init__(self, args):
         with open(args.config, "r") as f:
@@ -47,22 +57,76 @@ class Main:
         self.CHECK_STRING = self.config['names']['name_check']
         self.SEARCH_STRING = self.config['names']['search_string']
 
+    async def pick_box_coordinate(self, image):
+        # Read image
+        try:
+            img = cv2.cvtColor(numpy.array(image), cv2.COLOR_RGB2BGR)
+        except AttributeError:
+            img = cv2.imread(image)
+        except TypeError:
+            img = cv2.imread(image.filename)
+        except Exception as e:
+            logger.error(e)
+            exit()
+
+        height, width, _ = img.shape
+
+        # Select ROI
+        cv2.namedWindow("Select", cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_EXPANDED)
+        cv2.resizeWindow("Select", (int(width/2), int(height/2)))
+        r = cv2.selectROI("Select", img)
+
+        # Crop image
+        imCrop = img[int(r[1]):int(r[1] + r[3]), int(r[0]):int(r[0] + r[2])]
+
+        if imCrop.size == 0:
+            return False
+
+        # Display cropped image
+        # cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
+        # cv2.imshow("Image", imCrop)
+        key = cv2.waitKey(0)
+        if key == 13:
+            cv2.destroyAllWindows()
+
+
+
+        logging.critical('You picked [%s, %s, %s, %s]', int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3]))
+        return [int(r[0]), int(r[1]), int(r[0] + r[2]), int(r[1] + r[3])]
+
+
     async def tap(self, location):
-        await self.p.tap(*self.config['locations'][location])
-        if location in self.config['waits']:
-            await asyncio.sleep(self.config['waits'][location])
+        while True:
+            try:
+                coordinates = self.config['locations'][location]
+            except Exception as e:
+                print(e)
+
+            if coordinates == None:
+                new_location = await self.get_location(location)
+                coordinates = self.config['locations'][location] = new_location
+                continue
+
+            break
+
+
+        if len(coordinates) == 2:
+            await self.p.tap(*coordinates)
+            if location in self.config['waits']:
+                await asyncio.sleep(self.config['waits'][location])
+        elif len(coordinates) == 4:
+            median_location = get_median_location(coordinates)
+            await self.p.tap(*median_location)
+            if location in self.config['waits']:
+                await asyncio.sleep(self.config['waits'][location])
+        else:
+            logger.error('Something is not right.')
+            raise Exception
 
     async def key(self, keycode):
         await self.p.key(keycode)
         if str(keycode).lower in self.config['waits']:
             await asyncio.sleep(self.config['waits'][str(keycode).lower])
-
-    async def cap_and_crop(self, box_location):
-        screencap = await self.p.screencap()
-        crop = screencap.crop(box_location)
-        text = self.tool.image_to_string(crop).replace("\n", " ")
-        logger.info('[OCR] Found text: ' + text)
-        return text
 
     async def switch_app(self):
         logger.info('Switching apps...')
@@ -81,20 +145,30 @@ class Main:
             [string|bool] -- Returns the OCR'd text, or false if empty or nothing found.
         '''
 
-        try:
-            cropped_image = image.crop(self.config['locations'][location])
-        except:
-            new_location = self.get_location(location, image)
-            cropped_image = image.crop(self.config['locations'][new_location])
+        while True:
+            try:
+                cropped_image = image.crop(self.config['locations'][location])
+            except:
+                final_string = None
+            else:
+                final_string = self.tool.image_to_string(cropped_image).replace("\n", " ").strip()
 
-        final_string = self.tool.image_to_string(cropped_image).replace("\n", " ").strip()
+            if not self.config['locations'][location]:
+                new_location = await self.get_location(location)
+                self.config['locations'][location] = new_location
+                cropped_image = image.crop(new_location)
+                continue
 
-        if final_string == '' or not final_string:
-            return false
+            if location == 'confirm_button_box' and "CONFIRM" not in final_string:
+                logger.error('Apparently your selection did not worked out. This button is always tricky. Try to select a different sized rectangle until it works')
+                continue
+
+            break
+
 
         return final_string
 
-    async def get_location(self, location, image):
+    async def get_location(self, location):
         '''Checks if the location exists on yaml.
             In case it doesn't, opens the wizard to pick coords.
             Afterwards appends them it on picked_coordinates.txt.
@@ -106,10 +180,21 @@ class Main:
         Returns:
             [array]           -- an array of either two or four elements
         '''
-        logger.error('Coordinate not found! Please select the coordinates for %s and press Space or Enter twice when done.', location)
-        coordinates = await coordpicker.pick_box_coordinate(image)
+        logger.critical('Coordinate not found! Please select the coordinates for %s and press Space or Enter twice when done.', location)
+
+        while True:
+            image = await self.p.screencap()
+            try:
+                coordinates = await self.pick_box_coordinate(image)
+            except ValueError:
+                continue
+            else:
+                if not coordinates:
+                    continue
+                break
+
         with open("picked_coordinates.txt", mode="a") as file:
-            await file.write(location + ': ' + coordinates)
+            file.write(str(location) + ': ' + str(coordinates) + '\n')
         logger.warning('Coordinate was saved to file picked_coordinates.txt. Put them on config.yaml afterwards to avoid this problem!')
         return coordinates
 
@@ -118,14 +203,10 @@ class Main:
         count = 0
         while True:
             screencap = await self.p.screencap()
-            crop = screencap.crop(self.config['locations']['waiting_box'])
-            text_wait = self.tool.image_to_string(crop).replace("\n", " ")
-            crop = screencap.crop(self.config['locations']['error_box'])
-            text_error = self.tool.image_to_string(crop).replace("\n", " ")
-            crop = screencap.crop(self.config['locations']['pokemon_to_trade_box'])
-            text_continue_trade = self.tool.image_to_string(crop).replace("\n", " ")
-            crop = screencap.crop(self.config['locations']['trade_button_label'])
-            text_trade_button = self.tool.image_to_string(crop).replace("\n", " ")
+            text_wait = await self.get_text(screencap, 'waiting_box')
+            text_error = await self.get_text(screencap, 'error_box')
+            text_continue_trade = await self.get_text(screencap, 'pokemon_to_trade_box')
+            text_trade_button = await self.get_text(screencap, 'trade_button_label')
 
             # Switches apps whenever count is too high (usually fixes stall problems, particularly on 'Waiting for' screen)
             if count > 5:
@@ -158,13 +239,14 @@ class Main:
                 break
             elif "TRADE" in text_trade_button:
                 logger.warning('Clicking TRADE button...')
-                await self.tap('trade_button')
+                await self.tap('trade_button_label')
             else:
                 logger.info('Did not find TRADE button. Got: ' + text_trade_button)
 
     async def search_select_and_click_next(self):
         while True:
-            text = await self.cap_and_crop(self.config['locations']['pokemon_to_trade_box'])
+            screencap = await self.p.screencap()
+            text = await self.get_text(screencap, 'pokemon_to_trade_box')
             if "POKEMON TO TRADE" not in text:
                 logger.info('Not in pokemon to trade screen. Trying again...')
             else:
@@ -182,42 +264,34 @@ class Main:
         # Selects and clicks next
         while True:
             screencap = await self.p.screencap()
-            crop = screencap.crop(self.config['locations']['next_button_box'])
-            text = self.tool.image_to_string(crop).replace("\n", " ")
+            text = await self.get_text(screencap, 'next_button_box')
             if text != "NEXT":
                 logger.info("Waiting for next, got" + text)
                 continue
             logger.warning("Found next button checking name...")
-            crop = screencap.crop(self.config['locations']['name_at_next_screen_box'])
-            text = self.tool.image_to_string(crop).replace("\n", " ")
+            text = await self.get_text(screencap, 'name_at_next_screen_box')
             if self.CHECK_STRING not in text:
                 logger.error("[Next Screen] Pokemon does not match " + self.CHECK_STRING + ". Got: " + text)
                 continue
             logger.warning("Name is good. Clicking next...")
-            await self.tap("next_button")
+            await self.tap("next_button_box")
             break
 
     async def check_and_confirm(self, app='second'):
         while True:
             screencap = await self.p.screencap()
-            crop = screencap.crop(self.config['locations']['confirm_button_box'])
-            text = self.tool.image_to_string(crop).replace("\n", " ")
+            text = await self.get_text(screencap, 'confirm_button_box')
             if text != "CONFIRM":
                 logger.info("Waiting for confirm, got " + text)
                 continue
             logger.warning("Found confirm button, performing last check...")
-            crop = screencap.crop(self.config['locations']['trade_name_box'])
-            text = self.tool.image_to_string(crop).replace("\n", " ")
-            crop2 = screencap.crop(self.config['locations']['trade_name_box_no_location'])
-            text2 = self.tool.image_to_string(crop2).replace("\n", " ")
+            text = await self.get_text(screencap, 'trade_name_box')
+            text2 = await self.get_text(screencap, 'trade_name_box_no_location')
             if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
                 logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
-                crop.show()
-                logger.error("Select a new rectangle. Press space twice when ready.")
-                self.config['locations']['trade_name_box'] = await coordpicker.pick_box_coordinate(screencap)
                 continue
             logger.warning("Pokemon name's good, confirming...")
-            await self.tap("confirm_button")
+            await self.tap("confirm_button_box")
 
             # Add a detect for the CANCEL button, just for the first app
             # when GPS fails exactly at the right moment it doesn't counts
@@ -227,32 +301,31 @@ class Main:
                     count += 1
                     logger.warning("Detecting CANCEL...")
                     screencap = await self.p.screencap()
-                    crop = screencap.crop(self.config['locations']['confirm_button_box'])
-                    text = self.tool.image_to_string(crop).replace("\n", " ")
+                    text = await self.get_text(screencap, 'confirm_button_box')
                     if text != "CANCEL":
                         logger.info("Waiting for cancel, got " + text)
                         if count > 5:
                             count = 0
                             logger.error('The confirming did not work. Trying again...')
-                            await self.tap("confirm_button")
+                            await self.tap("confirm_button_box")
                         continue
                     logger.warning('Found CANCEL. First app is OK. Moving on...')
                     break
             elif app == 'second':
                 await asyncio.sleep(2)
                 screencap = await self.p.screencap()
-                crop = screencap.crop(self.config['locations']['confirm_button_box'])
-                text = self.tool.image_to_string(crop).replace("\n", " ")
+                text = await self.get_text(screencap, 'confirm_button_box')
                 while text == "CONFIRM":
                     logger.error("Confirmation didn't get through. Trying again...")
-                    await self.tap("confirm_button")
+                    await self.tap("confirm_button_box")
                     continue
                 break
             break
 
     async def check_animation_has_finished(self):
         while True:
-            text = await self.cap_and_crop(self.config['locations']['weight_box'])
+            screencap = await self.p.screencap()
+            text = await self.get_text(screencap, 'weight_box')
             if 'WEIGHT' in text or 'kg' in text:
                 logger.warning('Animation finished, closing pokemon and moving on!')
                 await self.tap("close_pokemon_button")

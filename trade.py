@@ -211,6 +211,7 @@ class Main:
     async def start(self):
         self.p = PokemonGo()
         await self.p.set_device(self.args.device_id)
+        count = 0
 
         while True:
             await self.click_trade_button('first')
@@ -237,6 +238,11 @@ class Main:
             # Switches back. The expired mesage will be clicked on the next loop
             await self.switch_app()
 
+            count += 1
+            if args.stop_after is not None and count >= args.stop_after:
+                logger.info("Stop_after reached, stopping")
+                return
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pokemon go renamer')
@@ -244,6 +250,8 @@ if __name__ == '__main__':
                         help="Optional, if not specified the phone is automatically detected. Useful only if you have multiple phones connected. Use adb devices to get a list of ids.")
     parser.add_argument('--config', type=str, default='config.yaml',
                         help="Config file location.")
+    parser.add_argument('--stop-after', default=None, type=int,
+                        help='Stop after X pokemon')
     args = parser.parse_args()
 
     asyncio.run(Main(args).start())

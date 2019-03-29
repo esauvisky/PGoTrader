@@ -1,3 +1,4 @@
+#!/usr/bin/env python3.7
 import argparse
 import asyncio
 import logging
@@ -18,7 +19,7 @@ logger = logging.getLogger('ivcheck')
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
-formatter = ColoredFormatter("  %(log_color)s%(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s")
+formatter = ColoredFormatter("  %(log_color)s[%(asctime)s] %(levelname)-8s%(reset)s | %(log_color)s%(message)s%(reset)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
@@ -30,6 +31,7 @@ class Main:
         self.args = args
         tools = pyocr.get_available_tools()
         self.tool = tools[0]
+        self.p = PokemonGo()
 
         self.CHECK_STRING = self.config['names']['name_check']
         self.SEARCH_STRING = self.config['names']['search_string']
@@ -70,10 +72,16 @@ class Main:
             text_trade_button = self.tool.image_to_string(crop).replace("\n", " ")
 
             # Switches apps whenever count is too high (usually fixes stall problems, particularly on 'Waiting for' screen)
-            if count > 5:
+            if count > 5 and not args.single_device:
                 count = 0
                 logger.error('The trade has stalled. Trying to switch apps...')
                 await self.switch_app()
+                continue
+            elif count > 8 and args.single_device:
+                count = 0
+                logger.error('The trade has stalled. Trying to leave the trade and try again...')
+                await self.tap("leave_button")
+                await self.tap('error_box_ok')
                 continue
 
             if "Trade expired" in text_error:
@@ -105,13 +113,14 @@ class Main:
                 logger.info('Did not find TRADE button. Got: ' + text_trade_button)
 
     async def search_select_and_click_next(self):
-        while True:
-            text = await self.cap_and_crop(self.config['locations']['pokemon_to_trade_box'])
-            if "POKEMON TO TRADE" not in text:
-                logger.info('Not in pokemon to trade screen. Trying again...')
-            else:
-                logger.warning('Found POKEMON TO TRADE screen, selecting pokemons...')
-                break
+        if not args.single_device:
+            while True:
+                text = await self.cap_and_crop(self.config['locations']['pokemon_to_trade_box'])
+                if "POKEMON TO TRADE" not in text:
+                    logger.info('Not in pokemon to trade screen. Trying again...')
+                else:
+                    logger.warning('Found POKEMON TO TRADE screen, selecting pokemons...')
+                    break
 
         # Filter pokemon list
         await self.tap("search_button")
@@ -141,11 +150,17 @@ class Main:
 
     async def check_and_confirm(self, app='second'):
         while True:
+            count = 0
             screencap = await self.p.screencap()
             crop = screencap.crop(self.config['locations']['confirm_button_box'])
             text = self.tool.image_to_string(crop).replace("\n", " ")
             if text != "CONFIRM":
-                logger.info("Waiting for confirm, got " + text)
+                count += 1
+                logger.info("Waiting for confirm, got %s", text)
+                if count > 10:
+                    logger.error("Something's not right... Trying to fix it")
+                    await self.tap("error_box_ok")
+                    return False
                 continue
             logger.warning("Found confirm button, performing last check...")
             crop = screencap.crop(self.config['locations']['trade_name_box'])
@@ -154,6 +169,10 @@ class Main:
             text2 = self.tool.image_to_string(crop2).replace("\n", " ")
             if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
                 logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
+                if count > 10:
+                    logger.error("Something's not right... Trying to fix it")
+                    await self.tap("error_box_ok")
+                    return False
                 continue
             logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")
@@ -207,9 +226,28 @@ class Main:
                 await asyncio.sleep(10)
                 break
 
+    async def start_single(self):
+        await self.p.set_device(self.args.device_id)
+        count = 0
+
+        while True:
+            await self.click_trade_button()
+
+            await self.search_select_and_click_next()
+
+            await self.check_and_confirm()
+
+            logger.warning('Sleeping for cutscene...')
+            await asyncio.sleep(16)
+
+            await self.check_animation_has_finished()
+
+            count += 1
+            if args.stop_after is not None and count >= args.stop_after:
+                logger.info("Stop_after reached, stopping")
+                return
 
     async def start(self):
-        self.p = PokemonGo()
         await self.p.set_device(self.args.device_id)
         count = 0
 
@@ -228,7 +266,8 @@ class Main:
 
             await self.switch_app()
 
-            await self.check_and_confirm()
+            if not await self.check_and_confirm():
+                continue
 
             logger.warning('Sleeping for cutscene...')
             await asyncio.sleep(16)
@@ -252,6 +291,11 @@ if __name__ == '__main__':
                         help="Config file location.")
     parser.add_argument('--stop-after', default=None, type=int,
                         help='Stop after X pokemon')
+    parser.add_argument('--single-device', type=bool, nargs='?', const=True, default=False,
+                        help="Used for running two separate instances on two different devices")
     args = parser.parse_args()
 
-    asyncio.run(Main(args).start())
+    if args.single_device:
+        asyncio.run(Main(args).start_single())
+    else:
+        asyncio.run(Main(args).start())

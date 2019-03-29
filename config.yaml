@@ -1,28 +1,32 @@
 locations:
     trade_button: [860, 1670]                    # the trade button
     trade_button_label: [790, 1680, 1000, 1730]  # the label of the trade button
+    leave_button: [120, 160]                     # the exit button on the waiting for screen
+                                                #   (only for --single device)
 
-    waiting_box: [207, 305, 900, 570]  # the "Waiting for NAME to connect" text
-    error_box: [100, 700, 1000, 1200]  # the error boxes that can appear when trading
-    error_box_ok: [540, 1020]          # the OK button at the error boxes
+    waiting_box: [218, 378, 864, 532]   # the "Waiting for NAME to connect" text
+    error_box: [33, 799, 1048, 1343]   # the error boxes that can appear when trading
+    error_box_ok: [550, 1196]
 
-    pokemon_to_trade_box: [300, 160, 780, 230]   # the POKEMON TO TRADE text after the trade begins (at the poke selector)
+    pokemon_to_trade_box: [305, 150, 774, 238]
     search_button: [950, 320]                    # the search button in the pokemon selector
     first_pokemon: [200, 600]                    # the first pokemon's position
 
-    next_button_box: [460, 1460, 620, 1520]        # the NEXT button text after selecting a pokemon
-    name_at_next_screen_box: [180, 180, 620, 270]  # the pokemon's name in the NEXT screen
-    next_button: [545, 1484]                       # the NEXT button
+    next_button_box: [414, 1736, 661, 1852]
+    next_button: [530, 1810]
+    name_at_next_screen_box: [180, 195, 632, 298]
 
-    trade_name_box: [580, 1280, 960, 1345]                # the pokémon's name text in the final screen
-    trade_name_box_no_location: [580, 1280, 930, 1390]    # the pokémon's name text in the final screen (when it has no location info)
-    confirm_button_box: [26, 928, 240, 990]  # the CONFIRM button text in the final screen
-    confirm_button: [120, 950]               # the CONFIRM button
+    confirm_button_box: [11, 1066, 278, 1169]
 
-    weight_box: [110, 1060, 330, 1230]   # the weight text in the pokémon's screen after the animation (the whole thing, including the height itself)
-    close_pokemon_button: [540, 1705]    # the X button for closing the pokémon screen
+    trade_name_box: [510, 1560, 960, 1650]                # the pokémon's name text in the final screen
+    trade_name_box_no_location: [510, 1560, 960, 1680]    # the pokémon's name text in the final screen (when it has no location info)
+    confirm_button_box: [31, 1086, 253, 1144]             # the CONFIRM button text in the final screen
+    confirm_button: [160, 1110]                           # the CONFIRM button
 
-    second_app_position: [540, 975]  # where to click to switch to the second app after the app switcher is opened
+    weight_box: [110, 1060, 330, 1310]   # the weight text in the pokémon's screen after the animation (the whole thing, including the height itself)
+    close_pokemon_button: [540, 2020]    # the X button for closing the pokémon screen
+
+    second_app_position: [514, 1191] # where to click to switch to the second app after the app switcher is opened
 
 waits:
     trade_button: 2.5
@@ -30,11 +34,12 @@ waits:
     error_box_ok: 1
     confirm_button: 1.5
     first_pokemon: 0.7
+    leave_button: 3
 
 names:
     name_check: "TRAD"    # all your trading pokémons *must* contain this string to ensure
                           #   the script doesn't trade a pokémon that wasn't intended to be traded.
-    search_string: "π,Ω,μ"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
+    search_string: "π,Ω,μ,⇆"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
 
     # Example:
     #   If all your pokémons for trade are named: '! TRADE', you'd use above:

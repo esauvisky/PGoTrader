@@ -190,6 +190,7 @@ class Main:
             break
 
     async def check_animation_has_finished(self):
+        count = 0
         while True:
             text = await self.cap_and_crop(self.config['locations']['weight_box'])
             if 'WEIGHT' in text or 'kg' in text:
@@ -197,6 +198,15 @@ class Main:
                 await self.tap("close_pokemon_button")
                 break
             logger.info('Animation not finished yet...')
+            count += 1
+            if count > 10:
+                logger.critical('Something bad happened. :| Trying to fix it.')
+                await self.tap("error_box_ok")
+                await asyncio.sleep(10)
+                await self.tap("close_pokemon_button")
+                await asyncio.sleep(10)
+                break
+
 
     async def start(self):
         self.p = PokemonGo()

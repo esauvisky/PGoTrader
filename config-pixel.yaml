@@ -27,15 +27,15 @@ locations:
 
 waits:
     trade_button: 2.5
-    second_app_position: 1
+    second_app_position: 2.5
     error_box_ok: 1
     confirm_button: 1.5
-    first_pokemon: 0.7
+    first_pokemon: 1
 
 names:
-    name_check: "eecko"    # all your trading pokémons *must* contain this string to ensure
+    name_check: "TRAD"    # all your trading pokémons *must* contain this string to ensure
                           #   the script doesn't trade a pokémon that wasn't intended to be traded.
-    search_string: "Treecko"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
+    search_string: "π,Ω,μ"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
 
     # Example:
     #   If all your pokémons for trade are named: '! TRADE', you'd use above:

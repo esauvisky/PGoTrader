@@ -103,6 +103,9 @@ class Main:
                 await self.tap('trade_button')
             else:
                 logger.info('Did not find TRADE button. Got: ' + text_trade_button)
+                count += 1
+                if count >= 10:
+                    await self.check_animation_has_finished()
 
     async def search_select_and_click_next(self):
         while True:
@@ -154,6 +157,11 @@ class Main:
             text2 = self.tool.image_to_string(crop2).replace("\n", " ")
             if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
                 logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
+                if count > 10:
+                    logger.error("Something's not right... Trying to fix it")
+                    await self.tap("error_box_ok")
+                    await self.check_animation_has_finished()
+                    return False
                 continue
             logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")

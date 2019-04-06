@@ -111,6 +111,9 @@ class Main:
                 await self.tap('trade_button')
             else:
                 logger.info('Did not find TRADE button. Got: ' + text_trade_button)
+                count += 1
+                if count >= 10:
+                    await self.check_animation_has_finished()
 
     async def search_select_and_click_next(self):
         if not args.single_device:
@@ -172,6 +175,7 @@ class Main:
                 if count > 10:
                     logger.error("Something's not right... Trying to fix it")
                     await self.tap("error_box_ok")
+                    await self.check_animation_has_finished()
                     return False
                 continue
             logger.warning("Pokemon name's good, confirming...")

@@ -4,23 +4,23 @@ locations:
 
     waiting_box: [207, 305, 900, 570]  # the "Waiting for NAME to connect" text
     error_box: [100, 700, 1000, 1200]  # the error boxes that can appear when trading
-    error_box_ok: [540, 1020]          # the OK button at the error boxes
+    error_box_ok: [540, 1220]          # the OK button at the error boxes
 
     pokemon_to_trade_box: [300, 160, 780, 230]   # the POKEMON TO TRADE text after the trade begins (at the poke selector)
     search_button: [950, 320]                    # the search button in the pokemon selector
     first_pokemon: [200, 600]                    # the first pokemon's position
 
-    next_button_box: [460, 1460, 620, 1520]        # the NEXT button text after selecting a pokemon
-    name_at_next_screen_box: [180, 180, 620, 270]  # the pokemon's name in the NEXT screen
-    next_button: [545, 1484]                       # the NEXT button
+    next_button_box: [135, 1750, 650, 1840]        # the NEXT button text after selecting a pokemon
+    name_at_next_screen_box: [180, 180, 740, 300]  # the pokemon's name in the NEXT screen
+    next_button: [545, 1800]                       # the NEXT button
 
-    trade_name_box: [580, 1280, 960, 1345]                # the pokémon's name text in the final screen
-    trade_name_box_no_location: [580, 1280, 930, 1390]    # the pokémon's name text in the final screen (when it has no location info)
-    confirm_button_box: [26, 928, 240, 990]  # the CONFIRM button text in the final screen
-    confirm_button: [120, 950]               # the CONFIRM button
+    trade_name_box: [500, 1560, 960, 1645]                # the pokémon's name text in the final screen
+    trade_name_box_no_location: [500, 1560, 960, 1670]    # the pokémon's name text in the final screen (when it has no location info)
+    confirm_button_box: [15, 1075, 290, 1170]  # the CONFIRM button text in the final screen
+    confirm_button: [125, 1120]               # the CONFIRM button
 
-    weight_box: [110, 1060, 330, 1230]   # the weight text in the pokémon's screen after the animation (the whole thing, including the height itself)
-    close_pokemon_button: [540, 1705]    # the X button for closing the pokémon screen
+    weight_box: [120, 1080, 370, 1290]   # the weight text in the pokémon's screen after the animation (the whole thing, including the height itself)
+    close_pokemon_button: [540, 2000]    # the X button for closing the pokémon screen
 
     second_app_position: [540, 975]  # where to click to switch to the second app after the app switcher is opened
 

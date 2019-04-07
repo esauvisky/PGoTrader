@@ -25,12 +25,25 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-def get_median_location(box_location):
-    '''
-    Given a list of 4 coordinates, returns the central point of the box
-    '''
-    x1, y1, x2, y2 = box_location
+def get_center_point(box_coordinates):
+    """
+    Returns the center point coordinate of a rectangle.
+
+    Args:
+        box_coordinates (list): A list of four (int) coordinates,
+                                representing a rectangle "box".
+    Returns:
+        list: A list with two (int) coordinates, the center point
+              of the coordinate, i.e.: the intersection between
+              the rectangle's diagonals.
+    """
+    x1, y1, x2, y2 = box_coordinates
     return [int((x1 + x2) / 2), int((y1 + y2) / 2)]
+
+
+class InvalidTapCoordinates(Exception):
+    # TODO: the WIP wizard should probably be dealt here
+    pass
 
 
 class Main:
@@ -47,7 +60,22 @@ class Main:
         self.SEARCH_STRING = self.config['names']['search_string']
 
     async def tap(self, location):
-        await self.p.tap(*self.config['locations'][location])
+        # TODO: this should be moved to pokemonlib?
+        try:
+            coordinates = self.config['locations'][location]
+        except Exception as e:
+            logger.error('The location is not yet setup in config.yaml. Either set them up manually, or use the wizard.')
+            raise e
+
+        if len(coordinates) == 2:
+            await self.p.tap(*coordinates)
+        elif len(coordinates) == 4:
+            center_point = get_center_point(coordinates)
+            await self.p.tap(*center_point)
+        else:
+            logger.error('Something is not right.')
+            raise InvalidTapCoordinates
+
         if location in self.config['waits']:
             await asyncio.sleep(self.config['waits'][location])
 

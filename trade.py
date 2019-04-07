@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.7
 import argparse
+import random
 import asyncio
 import logging
 import re
@@ -24,6 +25,14 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
+def get_median_location(box_location):
+    '''
+    Given a list of 4 coordinates, returns the central point of the box
+    '''
+    x1, y1, x2, y2 = box_location
+    return [int((x1 + x2) / 2), int((y1 + y2) / 2)]
+
+
 class Main:
     def __init__(self, args):
         with open(args.config, "r") as f:
@@ -31,6 +40,8 @@ class Main:
         self.args = args
         tools = pyocr.get_available_tools()
         self.tool = tools[0]
+        self.p = PokemonGo()
+        self.i = 2
 
         self.CHECK_STRING = self.config['names']['name_check']
         self.SEARCH_STRING = self.config['names']['search_string']
@@ -45,13 +56,6 @@ class Main:
         if str(keycode).lower in self.config['waits']:
             await asyncio.sleep(self.config['waits'][str(keycode).lower])
 
-    async def cap_and_crop(self, box_location):
-        screencap = await self.p.screencap()
-        crop = screencap.crop(box_location)
-        text = self.tool.image_to_string(crop).replace("\n", " ")
-        logger.info('[OCR] Found text: ' + text)
-        return text
-
     async def switch_app(self):
         logger.info('Switching apps...')
         await self.key('APP_SWITCH')
@@ -61,13 +65,13 @@ class Main:
         count = 0
         while True:
             screencap = await self.p.screencap()
-            crop = screencap.crop(self.config['locations']['waiting_box'])
+            crop = screencap.crop(self.config['locations']['waiting_box'])  #.quantize(random.randint(2,5), kmeans=random.randint(1,4))
             text_wait = self.tool.image_to_string(crop).replace("\n", " ")
-            crop = screencap.crop(self.config['locations']['error_box'])
+            crop = screencap.crop(self.config['locations']['error_box'])  #.quantize(random.randint(2,5), kmeans=random.randint(1,4))
             text_error = self.tool.image_to_string(crop).replace("\n", " ")
-            crop = screencap.crop(self.config['locations']['pokemon_to_trade_box'])
+            crop = screencap.crop(self.config['locations']['pokemon_to_trade_box'])  #.quantize(2, kmeans=random.randint(1,4))
             text_continue_trade = self.tool.image_to_string(crop).replace("\n", " ")
-            crop = screencap.crop(self.config['locations']['trade_button_label'])
+            crop = screencap.crop(self.config['locations']['trade_button_label'])  #.quantize(2, kmeans=random.randint(1,4))
             text_trade_button = self.tool.image_to_string(crop).replace("\n", " ")
 
             # Switches apps whenever count is too high (usually fixes stall problems, particularly on 'Waiting for' screen)
@@ -105,12 +109,14 @@ class Main:
             else:
                 logger.info('Did not find TRADE button. Got: ' + text_trade_button)
                 count += 1
-                if count >= 10:
+                if count >= 6:
                     await self.check_animation_has_finished()
 
     async def search_select_and_click_next(self):
         while True:
-            text = await self.cap_and_crop(self.config['locations']['pokemon_to_trade_box'])
+            screencap = await self.p.screencap()
+            crop = screencap.crop(self.config['locations']['pokemon_to_trade_box']) #.quantize(2, kmeans=random.randint(1,4))
+            text = self.tool.image_to_string(crop).replace("\n", " ")
             if "POKEMON TO TRADE" not in text:
                 logger.info('Not in pokemon to trade screen. Trying again...')
             else:
@@ -130,11 +136,11 @@ class Main:
             screencap = await self.p.screencap()
             crop = screencap.crop(self.config['locations']['next_button_box'])
             text = self.tool.image_to_string(crop).replace("\n", " ")
-            if text != "NEXT":
+            if "NEXT" not in text:
                 logger.info("Waiting for next, got" + text)
                 continue
             logger.warning("Found next button checking name...")
-            crop = screencap.crop(self.config['locations']['name_at_next_screen_box'])
+            crop = screencap.crop(self.config['locations']['name_at_next_screen_box']).quantize(random.randint(2,10), kmeans=random.randint(1,4))
             text = self.tool.image_to_string(crop).replace("\n", " ")
             if self.CHECK_STRING not in text:
                 logger.error("[Next Screen] Pokemon does not match " + self.CHECK_STRING + ". Got: " + text)
@@ -144,25 +150,29 @@ class Main:
             break
 
     async def check_and_confirm(self, app='second'):
+        count = 0
         while True:
             screencap = await self.p.screencap()
-            crop = screencap.crop(self.config['locations']['confirm_button_box'])
+            crop = screencap.crop(self.config['locations']['confirm_button_box']).quantize(random.randint(2,5), kmeans=random.randint(1,4))
             text = self.tool.image_to_string(crop).replace("\n", " ")
             if text != "CONFIRM":
                 logger.info("Waiting for confirm, got " + text)
                 continue
             logger.warning("Found confirm button, performing last check...")
-            crop = screencap.crop(self.config['locations']['trade_name_box'])
+            crop = screencap.crop(self.config['locations']['trade_name_box']).quantize(self.i, kmeans=random.randint(1,4))
             text = self.tool.image_to_string(crop).replace("\n", " ")
             crop2 = screencap.crop(self.config['locations']['trade_name_box_no_location'])
             text2 = self.tool.image_to_string(crop2).replace("\n", " ")
             if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
                 logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
+                self.i = max(1,self.i + random.randint(-1,2))
+                count += 1
                 if count > 10:
+                    count = 0
                     logger.error("Something's not right... Trying to fix it")
                     await self.tap("error_box_ok")
-                    await self.check_animation_has_finished()
-                    return False
+                    await self.tap("leave_button")
+                    await self.tap("error_box_ok")
                 continue
             logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")
@@ -175,21 +185,24 @@ class Main:
                     count += 1
                     logger.warning("Detecting CANCEL...")
                     screencap = await self.p.screencap()
-                    crop = screencap.crop(self.config['locations']['confirm_button_box'])
+                    crop = screencap.crop(self.config['locations']['confirm_button_box']).quantize(random.randint(2,5), kmeans=random.randint(1,4))
                     text = self.tool.image_to_string(crop).replace("\n", " ")
                     if text != "CANCEL":
                         logger.info("Waiting for cancel, got " + text)
-                        if count > 5:
+                        count += 1
+                        if count > 7:
                             count = 0
                             logger.error('The confirming did not work. Trying again...')
-                            await self.tap("confirm_button")
+                            await self.tap("error_box_ok")
+                            await self.tap("leave_button")
+                            await self.tap("error_box_ok")
                         continue
                     logger.warning('Found CANCEL. First app is OK. Moving on...')
                     break
             elif app == 'second':
                 await asyncio.sleep(2)
                 screencap = await self.p.screencap()
-                crop = screencap.crop(self.config['locations']['confirm_button_box'])
+                crop = screencap.crop(self.config['locations']['confirm_button_box']).quantize(random.randint(2,5), kmeans=random.randint(1,4))
                 text = self.tool.image_to_string(crop).replace("\n", " ")
                 while text == "CONFIRM":
                     logger.error("Confirmation didn't get through. Trying again...")
@@ -201,7 +214,9 @@ class Main:
     async def check_animation_has_finished(self):
         count = 0
         while True:
-            text = await self.cap_and_crop(self.config['locations']['weight_box'])
+            screencap = await self.p.screencap()
+            crop = screencap.crop(self.config['locations']['weight_box']).quantize(random.randint(2,5), kmeans=random.randint(1,4))
+            text = self.tool.image_to_string(crop).replace("\n", " ")
             if 'WEIGHT' in text or 'kg' in text:
                 logger.warning('Animation finished, closing pokemon and moving on!')
                 await self.tap("close_pokemon_button")
@@ -216,9 +231,28 @@ class Main:
                 await asyncio.sleep(10)
                 break
 
+    async def start_single(self):
+        await self.p.set_device(self.args.device_id)
+        count = 0
+
+        while True:
+            await self.click_trade_button()
+
+            await self.search_select_and_click_next()
+
+            await self.check_and_confirm()
+
+            logger.warning('Sleeping for cutscene...')
+            await asyncio.sleep(16)
+
+            await self.check_animation_has_finished()
+
+            count += 1
+            if args.stop_after is not None and count >= args.stop_after:
+                logger.info("Stop_after reached, stopping")
+                return
 
     async def start(self):
-        self.p = PokemonGo()
         await self.p.set_device(self.args.device_id)
         count = 0
 

@@ -1,4 +1,16 @@
 #!/usr/bin/env python3.7
+
+
+##### TODO #####
+#? Clean up .venv and generate a decent `requirements.txt`
+#? Get what's worth from `wizard` branch and cherry pick these things, particularly the methods.
+#! UNDER NO CIRCUMSTANCES MERGE `wizard` IT"S TOO MESSY and cumbersome.
+
+#? Check if there's anything else on `single_instance` branch. If so, give it a though if it's worth it.
+#? Refactor basically everything into their own modules.
+#? Do the same for the egg hatcher.
+
+
 import argparse
 import random
 import asyncio

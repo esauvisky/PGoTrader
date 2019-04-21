@@ -128,8 +128,9 @@ class Main:
                 logger.info('Found This trade with... has expired box.')
                 await self.tap('error_box_ok')
             elif "out of range" in text_error:
-                logger.info('Found out of range box.')
-                await self.tap('error_box_ok')
+                logger.info('Found out of range box, switching apps and trying again to update location.')
+                await self.tap("error_box_ok")
+                await self.tap("leave_button")
             elif "Unknown Trade Error" in text_error:
                 logger.info('Found Unknown Trade Error box.')
                 await self.tap('error_box_ok')
@@ -179,13 +180,17 @@ class Main:
             if "NEXT" not in text:
                 logger.info("Waiting for next, got" + text)
                 continue
-            logger.warning("Found next button checking name...")
-            crop = screencap.crop(self.config['locations']['name_at_next_screen_box']).quantize(random.randint(2,10), kmeans=random.randint(1,4))
-            text = self.tool.image_to_string(crop).replace("\n", " ")
-            if self.CHECK_STRING not in text:
-                logger.error("[Next Screen] Pokemon does not match " + self.CHECK_STRING + ". Got: " + text)
-                continue
-            logger.warning("Name is good. Clicking next...")
+            if not self.CHECK_STRING:
+                logger.warning("Found next button... Skipping name check!!")
+            else:
+                logger.warning("Found next button checking name...")
+                crop = screencap.crop(self.config['locations']['name_at_next_screen_box']).quantize(random.randint(2,10), kmeans=random.randint(1,4))
+                text = self.tool.image_to_string(crop).replace("\n", " ")
+                if self.CHECK_STRING not in text:
+                    logger.error("[Next Screen] Pokemon does not match " + self.CHECK_STRING + ". Got: " + text)
+                    continue
+                logger.warning("Name is good. Clicking next...")
+
             await self.tap("next_button")
             break
 
@@ -198,23 +203,27 @@ class Main:
             if text != "CONFIRM":
                 logger.info("Waiting for confirm, got " + text)
                 continue
-            logger.warning("Found confirm button, performing last check...")
-            crop = screencap.crop(self.config['locations']['trade_name_box']).quantize(self.i, kmeans=random.randint(1,4))
-            text = self.tool.image_to_string(crop).replace("\n", " ")
-            crop2 = screencap.crop(self.config['locations']['trade_name_box_no_location'])
-            text2 = self.tool.image_to_string(crop2).replace("\n", " ")
-            if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
-                logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
-                self.i = max(1,self.i + random.randint(-1,2))
-                count += 1
-                if count > 10:
-                    count = 0
-                    logger.error("Something's not right... Trying to fix it")
-                    await self.tap("error_box_ok")
-                    await self.tap("leave_button")
-                    await self.tap("error_box_ok")
-                continue
-            logger.warning("Pokemon name's good, confirming...")
+
+            if not self.CHECK_STRING:
+                logger.warning("Found confirm button. NOT CHECKING NAME!")
+            else:
+                logger.warning("Found confirm button, performing last check...")
+                crop = screencap.crop(self.config['locations']['trade_name_box']).quantize(self.i, kmeans=random.randint(1,4))
+                text = self.tool.image_to_string(crop).replace("\n", " ")
+                crop2 = screencap.crop(self.config['locations']['trade_name_box_no_location'])
+                text2 = self.tool.image_to_string(crop2).replace("\n", " ")
+                if self.CHECK_STRING not in text and self.CHECK_STRING not in text2:
+                    logger.error("[Confirm Screen] Pokemon name is wrong! I've got: " + text + ' and ' + text2)
+                    self.i = max(1,self.i + random.randint(-1,2))
+                    count += 1
+                    if count > 10:
+                        count = 0
+                        logger.error("Something's not right... Trying to fix it")
+                        await self.tap("error_box_ok")
+                        await self.tap("leave_button")
+                        await self.tap("error_box_ok")
+                    continue
+                logger.warning("Pokemon name's good, confirming...")
             await self.tap("confirm_button")
 
             # Add a detect for the CANCEL button, just for the first app
@@ -241,14 +250,15 @@ class Main:
                     break
             elif app == 'second':
                 await asyncio.sleep(2)
-                screencap = await self.p.screencap()
-                crop = screencap.crop(self.config['locations']['confirm_button_box']).quantize(random.randint(2,5), kmeans=random.randint(1,4))
-                text = self.tool.image_to_string(crop).replace("\n", " ")
-                while text == "CONFIRM":
-                    logger.error("Confirmation didn't get through. Trying again...")
-                    await self.tap("confirm_button")
-                    continue
-                break
+                while True:
+                    screencap = await self.p.screencap()
+                    crop = screencap.crop(self.config['locations']['confirm_button_box']).quantize(random.randint(2,5), kmeans=random.randint(1,4))
+                    text = self.tool.image_to_string(crop).replace("\n", " ")
+                    if text == "CONFIRM":
+                        logger.error("Confirmation didn't get through. Trying again...")
+                        await self.tap("confirm_button")
+                        continue
+                    break
             break
 
     async def check_animation_has_finished(self):

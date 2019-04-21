@@ -34,7 +34,7 @@ locations:
     confirm_button_box: [31, 1086, 253, 1144]             # the CONFIRM button text in the final screen
     confirm_button: [160, 1110]                           # the CONFIRM button
 
-    second_app_position: [540, 975]  # where to click to switch to the second app after the app switcher is opened
+    second_app_position: [820, 1300]  # where to click to switch to the second app after the app switcher is opened
 
 waits:
     trade_button: 2.5
@@ -42,11 +42,12 @@ waits:
     error_box_ok: 1
     confirm_button: 1.5
     first_pokemon: 0.7
+    app_switch: 2
 
 names:
     name_check: "TRAD"    # all your trading pokémons *must* contain this string to ensure
                           #   the script doesn't trade a pokémon that wasn't intended to be traded.
-    search_string: "π,Ω,μ"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
+    search_string: "⇄,π,Ω,μ"   # this is what gets pasted on the search box to filter which pokémons are tradeable.
 
     # Example:
     #   If all your pokémons for trade are named: '! TRADE', you'd use above:

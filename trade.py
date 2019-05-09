@@ -2,7 +2,6 @@
 
 
 ##### TODO #####
-#? Clean up .venv and generate a decent `requirements.txt`
 #? Get what's worth from `wizard` branch and cherry pick these things, particularly the methods.
 #! UNDER NO CIRCUMSTANCES MERGE `wizard` IT"S TOO MESSY and cumbersome.
 
@@ -124,27 +123,35 @@ class Main:
             if "Trade expired" in text_error:
                 logger.info('Found Trade expired box.')
                 await self.tap('error_box_ok')
+                if app == 'last':
+                    break
             elif "This trade with" in text_error:
                 logger.info('Found This trade with... has expired box.')
                 await self.tap('error_box_ok')
+                if app == 'last':
+                    break
             elif "out of range" in text_error:
                 logger.info('Found out of range box, switching apps and trying again to update location.')
                 await self.tap("error_box_ok")
                 await self.tap("leave_button")
+                if app == 'last':
+                    break
             elif "Unknown Trade Error" in text_error:
                 logger.info('Found Unknown Trade Error box.')
                 await self.tap('error_box_ok')
-            elif "Waiting for" in text_wait:
+                if app == 'last':
+                    break
+            elif "Waiting for" in text_wait and app != 'last':
                 if app == 'first':
                     logger.warning('"Waiting for" message received! Trade is good to go! Continuing...')
                     break
                 else:
                     logger.info('"Waiting for" message received! Waiting for POKEMON TO TRADE screen...')
                     count += 1
-            elif "POKEMON TO TRADE" in text_continue_trade:
+            elif "POKEMON TO TRADE" in text_continue_trade and app != 'last':
                 logger.warning('"POKEMON TO TRADE" message received! Trade is good to go! Continuing...')
                 break
-            elif "TRADE" in text_trade_button:
+            elif "TRADE" in text_trade_button and app != 'last':
                 logger.warning('Clicking TRADE button...')
                 await self.tap('trade_button')
             else:
@@ -333,6 +340,9 @@ class Main:
 
             count += 1
             if args.stop_after is not None and count >= args.stop_after:
+                # Clicks the expired message on the last loop using the first function of the
+                # theoretical next toop:
+                await self.click_trade_button('last')
                 logger.info("Stop_after reached, stopping")
                 return
 
